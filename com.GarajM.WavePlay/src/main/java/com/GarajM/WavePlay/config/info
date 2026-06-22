@@ -1,0 +1,22 @@
+Ce face concret:
+1. securityFilterChain — Lanțul de filtre HTTP
+
+CORS → aplică politica de origini permise (definită mai jos)
+CSRF dezactivat → normal pentru API-uri REST stateless (nu folosesc sesiuni/cookie-uri de sesiune)
+Autorizare endpoint-uri:
+
+✅ Publice (fără autentificare): /api/auth/**, /api/file/**, /api/playlist/getAllPublicPlaylists, /api/playlist/getPlaylistWithSongs/**
+🔒 Protejate (necesită JWT valid): orice alt endpoint
+
+
+Sesiuni STATELESS → serverul nu reține starea între cereri; autentificarea se face prin JWT la fiecare request
+Filtru JWT → adaugă JwtAuthenticationFilter înaintea filtrului standard de autentificare
+
+
+2. corsConfigurationSource — Politica CORS
+Definește cine și cum poate accesa API-ul din browser:
+SetareValoareOrigini permiselocalhost:4200 (Angular), localhost:3000 (React/alt frontend)Metode HTTPGET, POST, PUT, DELETE, PATCH, OPTIONSHeadere permiseToate (*)Header expusAuthorization (pentru a putea citi JWT-ul din răspuns)CredentialsDa (permite trimiterea cookie-urilor/headerelor de autentificare)
+
+3. passwordEncoder — Encoder pentru parole
+
+Returnează un BCryptPasswordEncoder, folosit la hasharea parolelor înainte de salvarea în baza de date și la verificarea lor la autentificare.

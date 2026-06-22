@@ -1,0 +1,108 @@
+
+Let me break this down clearly for you as a junior Java/Spring Boot developer.
+
+What is this filter's role?
+Think of this filter as a security checkpoint/bouncer at the entrance of your application. Every single HTTP request that comes in must pass through it. Its job is to:
+
+Check if the request carries a JWT token
+Validate that token
+Tell Spring Security "hey, this user is authenticated and has this role"
+Line-by-line explanation
+The class declaration
+java
+public class JwtAuthenticationFilter extends OncePerRequestFilter
+OncePerRequestFilter is a Spring class that guarantees this filter runs exactly once per request — no duplicates, even in complex filter chains.
+
+The main method signature
+java
+protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+request → the incoming HTTP request (headers, body, etc.)
+response → the outgoing HTTP response
+filterChain → the chain of other filters that must also run after this one
+Step 1 — Read the Authorization header
+java
+final String authorizationHeader = request.getHeader("Authorization");
+Reads the Authorization header from the HTTP request. A valid header looks like:
+
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
+Step 2 — Extract the token
+java
+if (authorizationHeader != null && authorizationHeader.startsWith("Bearer ")) {
+    jwt = authorizationHeader.substring(7);
+First checks the header actually exists and starts with "Bearer "
+.substring(7) removes the first 7 characters ("Bearer ") to get just the raw token string
+java
+    email = jwtUtil.extractEmail(jwt);
+Calls your JwtUtil to decode the token and pull out the email claim stored inside it.
+
+Step 3 — Authenticate the user
+java
+if (email != null && SecurityContextHolder.getContext().getAuthentication() == null)
+Two conditions must both be true:
+
+Email was successfully extracted (token was readable)
+The user is not already authenticated in this request (avoids doing the work twice)
+java
+if (jwtUtil.validateToken(jwt, email) && jwtUtil.isAccessToken(jwt))
+Double-checks with your JwtUtil that:
+
+The token is valid (not expired, signature matches)
+It is specifically an access token (not a refresh token)
+Step 4 — Build the authentication object
+java
+String role = jwtUtil.extractRole(jwt);
+
+UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+    email,                  // principal  → WHO the user is
+    null,                   // credentials → password (not needed, JWT already proved identity)
+    Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role))  // authorities → WHAT they can do
+);
+UsernamePasswordAuthenticationToken is Spring Security's standard object representing an authenticated user
+The role gets prefixed with "ROLE_" because Spring Security requires that prefix (e.g. "ROLE_ADMIN", "ROLE_USER")
+java
+authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+Attaches extra metadata to the token (IP address, session ID) — useful for logging/auditing.
+
+java
+SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+This is the most important line. It places the authenticated user into Spring's SecurityContext — from this point on, Spring Security knows who this user is for this entire request.
+
+Step 5 — Pass to the next filter
+java
+filterChain.doFilter(request, response);
+Always called last. This hands the request off to the next filter in the chain (or to your controller if there are no more filters). If you forget this line, the request just stops dead — nothing works.
+
+Visual flow summary
+Incoming Request
+      │
+      ▼
+Read "Authorization" header
+      │
+      ├── Missing or no "Bearer "? ──────────────────────────┐
+      │                                                       │
+      ▼                                                       │
+Extract JWT → get email via JwtUtil                          │
+      │                                                       │
+      ├── Email null or already authenticated? ──────────────┤
+      │                                                       │
+      ▼                                                       │
+Validate token + confirm it's an access token               │
+      │                                                       │
+      ▼                                                       │
+Extract role → build UsernamePasswordAuthenticationToken     │
+      │                                                       │
+      ▼                                                       │
+Set authentication in SecurityContextHolder                  │
+      │                                                       │
+      └──────────────────────────────────────────────────────┘
+                              │
+                              ▼
+                  filterChain.doFilter() → next filter / controller
+The key takeaway: this filter never blocks or allows requests itself — it only identifies the user. It's your SecurityConfig (with .authorizeHttpRequests()) that actually decides which routes are protected.
+
+
+
+
+
+
+Claude is AI and can make mistakes. Please double-check responses.

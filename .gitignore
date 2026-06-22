@@ -1,0 +1,23 @@
+# Maven
+target/
+*.jar
+*.war
+*.class
+
+# IDE - IntelliJ
+.idea/
+*.iml
+out/
+
+# Spring Boot logs
+*.log
+logs/
+
+# Secrets - NEVER commit
+.env
+application-local.properties
+application-local.yml
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,46 @@
+Clasa JwtUtil — Explicație completă
+Ce este JWT și de ce avem nevoie de această clasă?
+Când un utilizator se autentifică într-o aplicație web, serverul trebuie să știe cine ești la fiecare cerere HTTP. Dar HTTP este stateless — serverul nu „ține minte" nimic între cereri.
+Soluția: JWT (JSON Web Token)
+În loc să stochezi sesiuni pe server, trimiți clientului un token semnat criptografic care conține identitatea utilizatorului. La fiecare cerere, clientul trimite token-ul, iar serverul îl verifică.
+JwtUtil este „cutia de unelte" care gestionează tot ciclul de viață al token-urilor în aplicația ta.
+
+Structura unui JWT
+Un JWT are 3 părți separate prin .:
+eyJhbGciOiJIUzI1NiJ9  .  eyJpZCI6MSwiZW1haWwiOiJ...  .  SflKxwRJSMeKKF2QT4fwpMeJf
+      HEADER                        PAYLOAD                        SIGNATURE
+   (algoritmul)              (datele utilizatorului)           (semnătura secretă)
+
+Anatomia clasei — bloc cu bloc
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.25s;
+    animation-timing-function: cubic-bezier(0.19, 1, 0.22, 1);
+  }
+VvisualizeVvisualize show_widget
+De ce avem nevoie de metodele extract*()?
+Acesta este centrul întrebării tale. Un JWT este un string opac — nu poți pur și simplu să-l citești fără să-l parsezi și verifici. JwtUtil face exact asta.
+Gândește-te la token ca la un bilet de intrare sigilat. Serverul trebuie să-l „deschidă" în mod sigur și să extragă informații din el. Metodele extract*() sunt exact acele „deschizătoare" specializate:
+java// Fără JwtUtil, ai face asta manual de fiecare dată:
+Claims claims = Jwts.parser().verifyWith(key).build()
+                    .parseSignedClaims(token).getPayload();
+String role = (String) claims.get("role");
+
+// Cu JwtUtil, simplu:
+String role = jwtUtil.extractRole(token);
+
+Cum funcționează intern — extractClaim()
+Există un singur mecanism central, bazat pe generics + functional interface:
+javaprivate <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
+    final Claims claims = extractAllClaims(token); // parsează + verifică semnătura
+    return claimsResolver.apply(claims);           // aplică funcția dorită
+}
+Orice metodă publică (extractId, extractEmail, etc.) nu face altceva decât să apeleze extractClaim cu o lambda diferită. Asta înseamnă că semnătura este verificată o singură dată, indiferent câte câmpuri extragi.
+
+De ce ACCESS și REFRESH token-uri separate?
+Access TokenRefresh TokenDuratăscurtă (ex. 15 min)lungă (ex. 7 zile)Conținutid, name, email, roledoar id, emailScopulautorizare la fiecare cerereobținerea unui nou access tokenRisc dacă e furatmic (expiră repede)mare (durează mult)
+Metodele isAccessToken() și isRefreshToken() previn atacuri unde cineva încearcă să folosească un refresh token direct pentru acces — token-ul conține câmpul "type" tocmai pentru această verificare.
+
+Rezumat al rolului clasei
+JwtUtil centralizează tot ce ține de JWT într-un singur loc: generare, semnare criptografică, parsare, extragere câmpuri și validare. Fără ea, fiecare filtru, controller sau serviciu care are nevoie de identitatea utilizatorului ar trebui să repete aceeași logică de parsare — cu riscul de erori de securitate distribuite prin tot codul.
