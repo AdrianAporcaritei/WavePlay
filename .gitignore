@@ -21,3 +21,6 @@ application-local.yml
 # OS
 .DS_Store
 Thumbs.db
+
+# Ignore a specific file
+explanation.txt
